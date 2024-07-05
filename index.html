@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=1" />
+  <title>Flounder</title>
+  <style>
+    body {
+      padding: 0;
+      margin: 0;
+    }
+
+    #joystick {
+      position: absolute;
+      left: 10%;
+      bottom: 10%;
+      width: 150px;
+      height: 150px;
+    }
+
+    #jump {
+      width: 12%;
+      position: absolute;
+      right: 10%;
+      bottom: 10%;
+      opacity: 0.5;
+    }
+
+    #jump:active {
+      opacity: 1;
+    }
+
+    #debug {
+      position: absolute;
+      top: 0;
+      left: 0;
+      background: black;
+      color: white;
+      padding: 5px;
+    }
+  </style>
+</head>
+
+<body>
+  <div id="debug">Data</div>
+  <div id="joystick"></div>
+  <img id="jump" src="/src/assets/jump.png"></img>
+  <script type="module" src="/src/logic.ts"></script>
+  <script type="module" src="/src/client.ts"></script>
+</body>
+
+</html>
