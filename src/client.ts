@@ -3,8 +3,9 @@ import nipplejs, { JoystickManager } from "nipplejs";
 import { animateGLTF, copyGLTF, getAnimationsGLTF, loadModelGLTF, updateAnimations } from "./modelLoader";
 import "./styles.css"
 
-import { AmbientLight, Color, DirectionalLight, Object3D, PerspectiveCamera, Scene, VSMShadowMap, Vector3, WebGLRenderer } from 'three';
+import { AmbientLight, Color, CubeTextureLoader, DirectionalLight, Object3D, PerspectiveCamera, RepeatWrapping, Scene, TextureLoader, VSMShadowMap, Vector3, WebGLRenderer } from 'three';
 import { GameState, PLAYER_HEIGHT, PlayerControls, SEND_ACTION_INTERVAL } from "./logic";
+import { ASSETS } from "./lib/assets";
 
 const DEAD_TURN_ZONE = 0.5;
 const DEAD_MOVE_ZONE = 0.25;
@@ -79,7 +80,15 @@ class RollGame {
 
     this.camera = new PerspectiveCamera(45, aspect, 1, 1000);
     this.scene = new Scene();
-    this.scene.background = new Color(0x87CEEB);
+    const loader = new CubeTextureLoader();
+
+    const textureCube = loader.load( [
+      ASSETS['skybox/DR_skybox_10_Back.png'], ASSETS['skybox/DR_skybox_10_Front.png'],
+      ASSETS['skybox/DR_skybox_10_Top.png'], ASSETS['skybox/DR_skybox_10_Bottom.png'],
+      ASSETS['skybox/DR_skybox_10_Left.png'], ASSETS['skybox/DR_skybox_10_Right.png']
+    ] );
+
+    this.scene.background = textureCube //new Color(0x87CEEB);
 
     this.camera.position.set(20, 20, 20); // all components equal
     this.camera.lookAt(this.scene.position);
