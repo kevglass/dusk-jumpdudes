@@ -11,12 +11,12 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@dimforge/rapier3d": "^0.13.1",
     "@types/three": "^0.165.0",
     "dusk-games-sdk": "^4.19.17",
     "nipplejs": "^0.10.2",
-    "three": "^0.165.0",
-    "vite-plugin-wasm": "^3.3.0"
+    "node-three-gltf": "^1.8.1",
+    "sharp": "^0.33.4",
+    "three": "^0.165.0"
   },
   "devDependencies": {
     "@typescript-eslint/eslint-plugin": "^7.8.0",

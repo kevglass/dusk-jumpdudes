@@ -3,23 +3,11 @@ import nipplejs, { JoystickManager } from "nipplejs";
 import { animateGLTF, copyGLTF, getAnimationsGLTF, loadModelGLTF, updateAnimations } from "./modelLoader";
 import "./styles.css"
 
-import { AmbientLight, Color, DirectionalLight, Mesh, Object3D, PerspectiveCamera, Quaternion, Scene, VSMShadowMap, Vector3, WebGLRenderer } from 'three';
-import { GameState, MOVE_SPEED, SEND_ACTION_INTERVAL } from "./logic";
-import RAPIER, { RigidBody } from "@dimforge/rapier3d";
-import { Interpolator } from "dusk-games-sdk";
+import { AmbientLight, Color, DirectionalLight, Object3D, PerspectiveCamera, Scene, VSMShadowMap, Vector3, WebGLRenderer } from 'three';
+import { GameState, PLAYER_HEIGHT, PlayerControls, SEND_ACTION_INTERVAL } from "./logic";
 
-const PLAYER_HEIGHT = 0.8;
-const PLAYER_RADIUS = 0.2;
-const PHYSICS_FPS = 30;
 const DEAD_TURN_ZONE = 0.5;
 const DEAD_MOVE_ZONE = 0.25;
-
-let lastActionSent = 0;
-
-interface LevelElement {
-  body: RAPIER.RigidBody;
-  mesh: Object3D;
-}
 
 const touchDevice = ('ontouchstart' in document.documentElement);
 
@@ -31,12 +19,8 @@ class RollGame {
   renderer: WebGLRenderer;
   lightGroup: Object3D;
 
-  playerBody?: RAPIER.RigidBody;
-  playerCollider?: RAPIER.Collider;
   playerObject?: Object3D;
-  otherPlayers: Record<string, Object3D> = {};
-
-  characterController?: RAPIER.KinematicCharacterController;
+  players: Record<string, Object3D> = {};
 
   lastFrame: number = Date.now();
 
@@ -44,9 +28,6 @@ class RollGame {
   level!: GLTF;
   game?: GameState;
   localPlayerId?: string;
-  moveSpeed: number = MOVE_SPEED;
-  turnSpeed: number = 0.1;
-  world: RAPIER.World;
   first: boolean = true;
   playerOn: string | undefined;
 
@@ -56,17 +37,13 @@ class RollGame {
   lastFps: number = Date.now();
   fps: number = 0;
 
-  elements: LevelElement[] = [];
-  onGround: boolean = false;
-  ang: number = 0;
-  floorBody: RigidBody | null = null;
   stick: { x: number, y: number } = { x: 0, y: 0 };
-
-  startTime: number = 0;
   jumpTime: number = 0;
 
-  playerInterpolators: Record<string, Interpolator<number[]>> = {};
-
+  controls: PlayerControls = { x: 0, y: 0, jump: false };
+  lastSentControls: PlayerControls = { x: 0, y: 0, jump: false };
+  lastActionSent: number = 0;
+  
   constructor() {
     const aspect = window.innerWidth / window.innerHeight;
 
@@ -86,11 +63,17 @@ class RollGame {
 
     if (!touchDevice) {
       (document.getElementById("jump") as HTMLImageElement).addEventListener("mousedown", () => {
-        this.jump();
+        this.controls.jump = true;
       })
+      window.addEventListener("mouseup", () => {
+        this.controls.jump = false;
+      });
     } else {
       document.getElementById("jump")?.addEventListener("touchstart", () => {
-        this.jump();
+        this.controls.jump = true;
+      });
+      window.addEventListener("touchend", () => {
+        this.controls.jump = false;
       });
     }
 
@@ -144,130 +127,45 @@ class RollGame {
       this.keys[key] = true;
 
       if (key === ' ') {
-        this.jump();
+        this.controls.jump = true;
       }
     });
     window.addEventListener("keyup", ({ key }) => {
       this.keys[key] = false;
+
+      if (key === ' ') {
+        this.controls.jump = false;
+      }
     });
-
-    const gravity = { x: 0.0, y: -9.81, z: 0.0 };
-    this.world = new RAPIER.World(gravity);
-
-    setInterval(() => {
-      this.update();
-    }, 1000 / PHYSICS_FPS);
   }
 
-  jump() {
-    if (this.onGround) {
-      this.vy = 0.5;
-    }
-  }
+  updateKeys(): void {
+    this.controls.x = 0;
+    this.controls.y = 0;
 
-  updateKeys(): number {
-    let delta: number = 0;
     if (this.keys['w']) {
-      delta = this.moveSpeed;
+      this.controls.y = 1;
     }
     if (this.keys['s']) {
-      delta = -this.moveSpeed;
+      this.controls.y = -1;
     }
-    if (this.playerObject) {
-      if (this.keys['a']) {
-        this.playerObject.rotation.y += this.turnSpeed;
-      }
-      if (this.keys['d']) {
-        this.playerObject.rotation.y -= this.turnSpeed;
-      }
+    if (this.keys['a']) {
+      this.controls.x = -1;
+    }
+    if (this.keys['d']) {
+      this.controls.x = 1;
     }
     if (this.stick.x || this.stick.y) {
       if (Math.abs(this.stick.y) > DEAD_MOVE_ZONE) {
         const mag = Math.abs(this.stick.y) - DEAD_MOVE_ZONE;
-        delta = mag * (this.stick.y < 0 ? -1 : 1) * (1 / (1 - DEAD_MOVE_ZONE)) * this.moveSpeed;
+        this.controls.y = mag * (this.stick.y < 0 ? -1 : 1) * (1 / (1 - DEAD_MOVE_ZONE));
       } else {
-        delta = 0;
+        this.controls.y = 0;
       }
 
-      if (this.playerObject) {
-        if (Math.abs(this.stick.x) > DEAD_TURN_ZONE) {
-          const mag = Math.abs(this.stick.x) - DEAD_TURN_ZONE;
-          this.playerObject.rotation.y -= this.turnSpeed * mag * (1 / (1 - DEAD_TURN_ZONE)) * (this.stick.x < 0 ? -1 : 1);
-        }
-      }
-    }
-
-    return delta;
-  }
-
-  update(): void {
-    if (this.playerObject) {
-      const dir = new Vector3();
-      this.playerObject.getWorldDirection(dir);
-
-      const delta = this.updateKeys();
-
-      if (delta !== 0) {
-        animateGLTF(this.playerObject, "walk");
-      } else {
-        animateGLTF(this.playerObject, "idle");
-      }
-
-      if (this.characterController && this.playerBody && this.playerCollider) {
-        for (const element of this.elements) {
-          if (this.game && this.game.moving[element.mesh.name]) {
-            const change = new Vector3().fromArray(this.game.moving[element.mesh.name].velocity);
-            element.mesh.position.add(change);
-            // update the moving platform 
-            const pos = new Vector3();
-            element.mesh.getWorldPosition(pos);
-            element.body.setTranslation(pos, true)
-            const q = new Quaternion();
-            element.mesh.getWorldQuaternion(q);
-            element.body.setRotation(q, true);
-          }
-        }
-
-        // clamp gravity
-        if (this.vy === 0) {
-          this.vy -= 0.1;
-        } else {
-          this.vy -= 0.05;
-          if (this.vy < -0.5) {
-            this.vy = -0.5;
-          }
-        }
-
-        const intendedMove = new RAPIER.Vector3(delta * dir.x, this.vy, delta * dir.z);
-        this.characterController.computeColliderMovement(this.playerCollider, intendedMove);
-        const current = this.playerBody.translation();
-        const move = this.characterController.computedMovement();
-        this.onGround = false;
-        for (let i = 0; i < this.characterController.numComputedCollisions(); i++) {
-          const collision = this.characterController.computedCollision(i);
-          if (collision) {
-            // hit the ground
-            if (collision.normal2.y < -0.5 && collision.witness2.y > PLAYER_HEIGHT) {
-              this.vy = 0;
-              this.onGround = true;
-
-              this.floorBody = collision.collider?.parent() ?? null;
-
-              const element = this.elements.find(e => e.body === this.floorBody);
-              this.playerOn = undefined;
-              if (element && this.game && this.game.moving[element.mesh.name]) {
-                const push = new Vector3().fromArray(this.game.moving[element.mesh.name].velocity);
-                move.x += push.x;
-                move.y += push.y;
-                move.z += push.z;
-                this.playerOn = element.mesh.name;
-              }
-            }
-          }
-        }
-
-        this.playerBody.setNextKinematicTranslation(new RAPIER.Vector3(current.x + move.x, current.y + move.y, current.z + move.z));
-        this.world.step();
+      if (Math.abs(this.stick.x) > DEAD_TURN_ZONE) {
+        const mag = Math.abs(this.stick.x) - DEAD_TURN_ZONE;
+        this.controls.x = mag * (1 / (1 - DEAD_TURN_ZONE)) * (this.stick.x < 0 ? -1 : 1);
       }
     }
   }
@@ -277,103 +175,38 @@ class RollGame {
     this.playerModel = await loadModelGLTF("characters1/character-gamer.glb");
     console.log(getAnimationsGLTF(this.playerModel));
 
-    // setup physics for level
+    console.log(this.level);
     this.scene.add(this.level.scene);
-    this.level.scene.traverse((node) => {
-      if (node instanceof Mesh) {
-        const pos = new Vector3();
-        node.getWorldPosition(pos);
-        const scale = new Vector3();
-        node.getWorldScale(scale);
-        const rot = new Quaternion();
-        node.getWorldQuaternion(rot);
-
-        const verts = new Float32Array(node.geometry.attributes.position.array);
-        for (let i = 0; i < verts.length; i += 3) {
-          verts[i] *= scale.x;
-          verts[i + 1] *= scale.y;
-          verts[i + 2] *= scale.z;
-        }
-
-        const platform = RAPIER.ColliderDesc.convexHull(verts)!;
-        const platformBody = RAPIER.RigidBodyDesc.fixed().setTranslation(pos.x, pos.y, pos.z).setRotation(new RAPIER.Quaternion(rot.x, rot.y, rot.z, rot.w));
-        const body = this.world.createRigidBody(platformBody);
-        this.world.createCollider(platform, body);
-
-        this.elements.push({
-          body: body,
-          mesh: node
-        })
-      }
-    });
-
-    // setup main character
-    this.playerObject = copyGLTF(this.playerModel);
-    this.playerObject.rotation.y = Math.PI;
-    animateGLTF(this.playerObject, "walk");
-    this.scene.add(this.playerObject);
-    const capsule = RAPIER.ColliderDesc.cylinder(PLAYER_HEIGHT / 2, PLAYER_RADIUS);
-    const targetBodyDesc = RAPIER.RigidBodyDesc.kinematicPositionBased().setTranslation(0, 5, -5);
-    this.playerBody = this.world.createRigidBody(targetBodyDesc);
-    this.playerCollider = this.world.createCollider(capsule, this.playerBody);
-    this.playerBody.setNextKinematicTranslation(new RAPIER.Vector3(0, 5, 0));
-    const offset = 0.01;
-    // Create the controller.
-    this.characterController = this.world.createCharacterController(offset);
-    this.characterController.enableAutostep(0.2, 0, false);
-    this.characterController.setMaxSlopeClimbAngle(45 * Math.PI / 180);
-    this.characterController.setMinSlopeSlideAngle(30 * Math.PI / 180);
   }
 
   start(): void {
     Dusk.initClient({
-      onChange: ({ game, futureGame, yourPlayerId }) => {
-        if (!this.startTime) {
-          this.startTime = Date.now();
-        }
-        this.game = game;
+      onChange: ({ game, yourPlayerId }) => {
         this.localPlayerId = yourPlayerId;
+        this.game = game;
 
-        for (const actor of (futureGame ?? game).actors) {
-          if (actor.id === yourPlayerId) {
-            continue;
-          }
-
-          if (!this.otherPlayers[actor.id]) {
-            console.log("Adding " + actor.id + " to " + this.localPlayerId);
-            this.otherPlayers[actor.id] = copyGLTF(this.playerModel);
-            this.scene.add(this.otherPlayers[actor.id]);
-          }
-
-          const actorObject = this.otherPlayers[actor.id];
-
-          actorObject.quaternion.copy(new Quaternion().fromArray(actor.q));
-          if (!this.playerInterpolators[actor.id]) {
-            this.playerInterpolators[actor.id] = Dusk.interpolatorLatency<number[]>({ maxSpeed: MOVE_SPEED * 1.5 });
-
-            this.playerInterpolators[actor.id].update({ game: actor.t, futureGame: actor.t });
-          }
-
-          if (game && futureGame) {
-            const futureActor = futureGame.actors.find(a => a.id === actor.id);
-            if (futureActor) {
-              this.playerInterpolators[actor.id].update({ game: actor.t, futureGame: futureActor.t });
-
-              for (let i = 0; i < 3; i++) {
-                if (actor.t[i] !== futureActor.t[i]) {
-                  actor.moving = true;
-                }
-              }
+        for (const p of game.players) {
+          if (!this.players[p.id]) {
+            this.players[p.id] = copyGLTF(this.playerModel);
+            this.scene.add(this.players[p.id]);
+            if (p.id === yourPlayerId) {
+              this.playerObject = this.players[p.id];
             }
           }
 
-          if (actor.moving) {
-            animateGLTF(actorObject, "walk");
-          } else {
-            animateGLTF(actorObject, "idle");
+          const body = game.world.bodies.find(b => b.id === p.bodyId);
+          if (body) {
+            this.players[p.id].position.set(body.center.x, body.center.y - (PLAYER_HEIGHT / 2), body.center.z);
+            this.players[p.id].rotation.y = body.angle;
           }
 
+          if (p.controls.x !== 0 || p.controls.y !== 0) {
+            animateGLTF(this.players[p.id], "walk");
+          } else {
+            animateGLTF(this.players[p.id], "idle");
+          }
         }
+
       }
     });
 
@@ -381,6 +214,8 @@ class RollGame {
   }
 
   render(): void {
+    this.updateKeys();
+
     const now = Date.now();
     const elapsed = now - this.lastFrame;
     this.lastFrame = now;
@@ -401,52 +236,32 @@ class RollGame {
   }
 
   renderScene(): void {
-    if (this.game) {
-      for (const actor of this.game.actors) {
-        if (this.playerInterpolators[actor.id]) {
-          const actorObject = this.otherPlayers[actor.id];
-          const pos = this.playerInterpolators[actor.id].getPosition();
-          actorObject.position.copy(new Vector3().fromArray(pos));
-        }
+    if (Date.now() - this.lastActionSent > SEND_ACTION_INTERVAL && this.localPlayerId) {
+      if (this.lastSentControls.x !== this.controls.x || this.lastSentControls.y !== this.controls.y || this.lastSentControls.jump !== this.controls.jump) {
+        this.lastSentControls = {...this.controls};
+
+        Dusk.actions.controls(this.lastSentControls);
+        this.lastActionSent = Date.now();
       }
     }
 
-    const direction = new Vector3();
-    if (!this.playerObject || !this.playerBody || !this.characterController || !this.playerCollider) {
-      return;
+    if (this.game) {
+      const p = this.game.players.find(p => p.id === this.localPlayerId);
+      if (p) {
+        this.setDebug("FPS:" + this.fps + " controls: " + this.controls.x + ","+this.controls.y+","+this.controls.jump+"  -  " + p.onGround );
+      } else {
+        this.setDebug("FPS:" + this.fps + " controls: " + this.controls.x + ","+this.controls.y+","+this.controls.jump+ " " );
+      }
     }
-
-    const physicsLocation = this.playerCollider.translation();
-    physicsLocation.x = Math.floor(physicsLocation.x * 100) / 100;
-    physicsLocation.y = Math.floor(physicsLocation.y * 100) / 100;
-    physicsLocation.z = Math.floor(physicsLocation.z * 100) / 100;
-
-    this.playerObject.position.set(physicsLocation.x, physicsLocation.y - (PLAYER_HEIGHT / 2), physicsLocation.z);
-
-    if (Date.now() - lastActionSent > SEND_ACTION_INTERVAL && this.localPlayerId) {
-      Dusk.actions.update({
-        id: this.localPlayerId,
-        q: this.playerObject.quaternion.toArray(),
-        t: this.playerObject.position.toArray(),
-        moving: this.updateKeys() != 0,
-        onGround: this.onGround,
-        vy: this.vy,
-        on: this.playerOn
-      })
-      lastActionSent = Date.now();
+    if (this.playerObject) {
+      const direction = new Vector3();
+      this.playerObject.getWorldDirection(direction);
+      const h = 2;
+      const frontDistance = 5;
+      this.camera.position.set(this.playerObject.position.x + (this.viewDistance * -direction.x), this.playerObject.position.y + h, this.playerObject.position.z + (this.viewDistance * -direction.z));
+      this.camera.lookAt(this.playerObject.position.x + (frontDistance * direction.x), this.playerObject.position.y, this.playerObject.position.z + (frontDistance * direction.z));
+      this.lightGroup.position.set(this.playerObject.position.x, 0, this.playerObject.position.z);
     }
-
-    this.setDebug("FPS:" + this.fps + " Ground: " + this.onGround + " " + JSON.stringify(physicsLocation) + " " + this.jumpTime);
-
-    this.playerObject.getWorldDirection(direction);
-
-    const h = 2;
-    const frontDistance = 5;
-
-    this.camera.position.set(this.playerObject.position.x + (this.viewDistance * -direction.x), this.playerObject.position.y + h, this.playerObject.position.z + (this.viewDistance * -direction.z));
-    this.camera.lookAt(this.playerObject.position.x + (frontDistance * direction.x), this.playerObject.position.y, this.playerObject.position.z + (frontDistance * direction.z));
-    this.lightGroup.position.set(this.playerObject.position.x, 0, this.playerObject.position.z);
-
     if (this.renderer && this.scene && this.camera) {
       this.renderer.render(this.scene, this.camera);
     }
