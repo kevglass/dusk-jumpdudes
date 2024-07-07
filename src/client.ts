@@ -3,7 +3,7 @@ import nipplejs, { JoystickManager } from "nipplejs";
 import { animateGLTF, copyGLTF, getAnimationsGLTF, loadModelGLTF, updateAnimations } from "./modelLoader";
 import "./styles.css"
 
-import { AmbientLight, Color, CubeTextureLoader, DirectionalLight, Object3D, PerspectiveCamera, RepeatWrapping, Scene, TextureLoader, VSMShadowMap, Vector3, WebGLRenderer } from 'three';
+import { AmbientLight, CubeTextureLoader, DirectionalLight, Object3D, PerspectiveCamera, Scene, Vector3, WebGLRenderer } from 'three';
 import { GameState, PLAYER_HEIGHT, PlayerControls, SEND_ACTION_INTERVAL } from "./logic";
 import { ASSETS } from "./lib/assets";
 
@@ -44,7 +44,7 @@ class RollGame {
   controls: PlayerControls = { x: 0, y: 0, jump: false };
   lastSentControls: PlayerControls = { x: 0, y: 0, jump: false };
   lastActionSent: number = 0;
-  
+
   constructor() {
     const aspect = window.innerWidth / window.innerHeight;
 
@@ -65,6 +65,7 @@ class RollGame {
     if (!touchDevice) {
       (document.getElementById("jump") as HTMLImageElement).addEventListener("mousedown", () => {
         this.controls.jump = true;
+        this.sendControls();
       })
       window.addEventListener("mouseup", () => {
         this.controls.jump = false;
@@ -72,6 +73,7 @@ class RollGame {
     } else {
       document.getElementById("jump")?.addEventListener("touchstart", () => {
         this.controls.jump = true;
+        this.sendControls();
       });
       window.addEventListener("touchend", () => {
         this.controls.jump = false;
@@ -98,7 +100,6 @@ class RollGame {
     });
 
     this.renderer.shadowMap.enabled = true;
-    this.renderer.shadowMap.type = VSMShadowMap
 
     this.renderer.setSize(window.innerWidth, window.innerHeight);
     document.body.appendChild(this.renderer.domElement);
@@ -137,6 +138,7 @@ class RollGame {
 
       if (key === ' ') {
         this.controls.jump = true;
+        this.sendControls();
       }
     });
     window.addEventListener("keyup", ({ key }) => {
@@ -194,6 +196,15 @@ class RollGame {
         this.localPlayerId = yourPlayerId;
         this.game = game;
 
+        for (const m of game.movers) {
+          const body = game.world.bodies.find(b => b.id === m.bodyId);
+          if (body) {
+            const obj = this.scene.getObjectByName(m.name);
+            if (obj) {
+              obj.position.set(body.center.x, body.center.y - (PLAYER_HEIGHT / 2), body.center.z);
+            }
+          }
+        }
         for (const p of game.players) {
           if (!this.players[p.id]) {
             this.players[p.id] = copyGLTF(this.playerModel);
@@ -209,7 +220,11 @@ class RollGame {
             this.players[p.id].rotation.y = body.angle;
           }
 
-          if (p.controls.x !== 0 || p.controls.y !== 0) {
+          if (p.vy < 0) {
+            animateGLTF(this.players[p.id], "jump");
+          } else if (p.vy > 0) {
+            animateGLTF(this.players[p.id], "fall");
+          } else if (p.controls.x !== 0 || p.controls.y !== 0) {
             animateGLTF(this.players[p.id], "walk");
           } else {
             animateGLTF(this.players[p.id], "idle");
@@ -244,7 +259,7 @@ class RollGame {
     this.renderScene();
   }
 
-  renderScene(): void {
+  sendControls(): void {
     if (Date.now() - this.lastActionSent > SEND_ACTION_INTERVAL && this.localPlayerId) {
       if (this.lastSentControls.x !== this.controls.x || this.lastSentControls.y !== this.controls.y || this.lastSentControls.jump !== this.controls.jump) {
         this.lastSentControls = {...this.controls};
@@ -253,6 +268,10 @@ class RollGame {
         this.lastActionSent = Date.now();
       }
     }
+  }
+
+  renderScene(): void {
+    this.sendControls();
 
     if (this.game) {
       const p = this.game.players.find(p => p.id === this.localPlayerId);

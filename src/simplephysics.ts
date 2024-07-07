@@ -81,6 +81,26 @@ export function createBox(world: World, center: Vec3, size: Vec3, angle: number,
     return box;
 }
 
+export function updateBox(box: Body): void {
+    const center = box.center;
+    const size = box.size;
+    const angle = box.angle;
+
+    const verts = [ // Vertex: 0: TopLeft, 1: TopRight, 2: BottomRight, 3: BottomLeft (rectangles)
+        { x: center.x - size.x / 2, z: center.z - size.z / 2 },
+        { x: center.x + size.x / 2, z: center.z - size.z / 2 },
+        { x: center.x + size.x / 2, z: center.z + size.z / 2 },
+        { x: center.x - size.x / 2, z: center.z + size.z / 2 },
+    ];
+
+    for (let i = 4; i--;) {
+        verts[i] = rotateVec2(verts[i], center, angle);
+    }
+
+    box.vertices = verts;
+    box.faceNormals = computeRectNormals(verts);
+}
+
 export function createCylinder(world: World, center: Vec3, size: Vec3, angle: number, dynamic: boolean): Body {
     const cylinder = {
         dynamic,
@@ -173,6 +193,14 @@ export function addVec2(a: Vec2, b: Vec2): Vec2 {
     return {
         x: (a.x + b.x),
         z: (a.z + b.z),
+    }
+}
+
+export function scaleVec3(a: Vec3, n: number): Vec3{
+    return {
+        x: (a.x * n),
+        y: (a.y * n),
+        z: (a.z * n),
     }
 }
 
