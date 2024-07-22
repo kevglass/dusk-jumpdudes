@@ -1,0 +1,52 @@
+{
+    "spike-block": {
+        "type": "SimpleTranslate",
+        "dir": { "x": -1, "y": 0, "z": 1 },
+        "amount": 2,
+        "interval": 2000,
+        "offset": 500
+    },
+    "spike-block001": {
+        "type": "SimpleTranslate",
+        "dir": { "x": -1, "y": 0, "z": 1 },
+        "amount": 2,
+        "interval": 2000,
+        "offset": 1500
+    },
+    "spike-block002": {
+        "type": "SimpleTranslate",
+        "dir": { "x": 0, "y": 0, "z": 1 },
+        "amount": 2,
+        "interval": 2000,
+        "offset": 500
+    },
+    "spike-block003": {
+        "type": "SimpleTranslate",
+        "dir": { "x": 0, "y": 0, "z": 1 },
+        "amount": 2,
+        "interval": 2000,
+        "offset": 1500
+    },
+    "crate-strong": {
+        "type": "SimpleTranslate",
+        "dir": { "x": 1, "y": 0, "z": 0 },
+        "amount": 5,
+        "interval": 3000,
+        "offset": 0,
+        "pause": 500
+    },
+    "crate-strong001": {
+        "type": "SimpleTranslate",
+        "dir": { "x": -1, "y": 0, "z": 0 },
+        "amount": 5,
+        "interval": 3000,
+        "offset": 0,
+        "pause": 500
+    },
+    "flag": {
+        "type": "Sensor"
+    },
+    "flag003": {
+        "type": "Sensor"
+    }
+}
