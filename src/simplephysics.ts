@@ -16,6 +16,7 @@ export type Vec2 = {
 
 export type Body = {
     dynamic: boolean;
+    sensor: boolean;
     type: ShapeType;
     id: number;
     center: Vec3;
@@ -52,7 +53,7 @@ export function createWorld(allowedStepSize: number): World {
     };
 }
 
-export function createBox(world: World, center: Vec3, size: Vec3, angle: number, dynamic: boolean): Body {
+export function createBox(world: World, center: Vec3, size: Vec3, angle: number, dynamic: boolean, sensor: boolean): Body {
     const verts = [ // Vertex: 0: TopLeft, 1: TopRight, 2: BottomRight, 3: BottomLeft (rectangles)
         { x: center.x - size.x / 2, z: center.z - size.z / 2 },
         { x: center.x + size.x / 2, z: center.z - size.z / 2 },
@@ -74,7 +75,8 @@ export function createBox(world: World, center: Vec3, size: Vec3, angle: number,
         vertices: verts,
         faceNormals: computeRectNormals(verts),
         id: world.nextBodyId++,
-        vy: 0
+        vy: 0,
+        sensor
     }
 
     world.bodies.push(box);
@@ -101,7 +103,7 @@ export function updateBox(box: Body): void {
     box.faceNormals = computeRectNormals(verts);
 }
 
-export function createCylinder(world: World, center: Vec3, size: Vec3, angle: number, dynamic: boolean): Body {
+export function createCylinder(world: World, center: Vec3, size: Vec3, angle: number, dynamic: boolean, sensor: boolean): Body {
     const cylinder = {
         dynamic,
         size,
@@ -112,7 +114,8 @@ export function createCylinder(world: World, center: Vec3, size: Vec3, angle: nu
         faceNormals: [],
         vertices: [],
         id: world.nextBodyId++,
-        vy: 0
+        vy: 0,
+        sensor
     }
 
     world.bodies.push(cylinder);
@@ -135,13 +138,16 @@ export function resolve(world: World, listener: CollisionListener): void {
                 continue;
             }
             if (boundTest(body, other)) {
-                // console.log(body.id + " overlap with " + other.id);
                 let collisionInfo: CollisionDetails = emptyCollision();
 
                 if (testCollision(world, body, other, collisionInfo)) {
                     const yPen = ((body.size.y + other.size.y) / 2) - Math.abs(body.center.y - other.center.y);
                     if (yPen > 0) {
                         let steppedUp = false;
+                        if (body.sensor || other.sensor) {
+                            listener.collision(body, other, { x: 0, y: 0, z: 0 })
+                            continue;
+                        }
 
                         // step up to move out of collision 
                         if (yPen < world.allowedStepSize) {
@@ -150,14 +156,15 @@ export function resolve(world: World, listener: CollisionListener): void {
                                 body.center.y += yPen;
                                 listener.collision(body, other, { x: 0, y: yPen, z: 0 })
                                 steppedUp = true;
-                            } else if (body.vy < 0) {
-                                body.center.y -= yPen;
-                                listener.collision(body, other, { x: 0, y: -yPen, z: 0 })
-                                steppedUp = true;
-                            }
+                            } 
+                            // else if (body.center.y < other.center.y && body.vy < 0) {
+                            //     body.center.y -= yPen;
+                            //     listener.collision(body, other, { x: 0, y: -yPen, z: 0 })
+                            //     steppedUp = true;
+                            // }
                         } 
 
-                        if (!steppedUp) {
+                        if (!steppedUp && Math.abs(yPen) > 0.0001) {
                             // Make sure the normal is always from object[i] to object[j]
                             if (dotProduct(collisionInfo.normal, subVec2(other.center, body.center)) < 0) {
                                 collisionInfo = {
@@ -169,7 +176,7 @@ export function resolve(world: World, listener: CollisionListener): void {
                             }
 
                             const dx = -collisionInfo.normal.x * collisionInfo.depth;
-                            const dz = -collisionInfo.normal.z * collisionInfo.depth
+                            const dz = -collisionInfo.normal.z * collisionInfo.depth;
                             body.center.x += dx;
                             body.center.z += dz;
                             listener.collision(body, other, { x: dx, y: 0, z: dz })
@@ -182,11 +189,13 @@ export function resolve(world: World, listener: CollisionListener): void {
 }
 
 function boundTest(s1: Body, s2: Body) {
-    const coincideX = Math.abs(s1.center.x - s2.center.x) < s1.size.x + s2.size.x;
+    const coincideX = Math.abs(s1.center.x - s2.center.x) < s1.bounds + s2.bounds;
     const coincideY = Math.abs(s1.center.y - s2.center.y) < s1.size.y + s2.size.y;
-    const coincideZ = Math.abs(s1.center.z - s2.center.z) < s1.size.z + s2.size.z;
+    const coincideZ = Math.abs(s1.center.z - s2.center.z) < s1.bounds + s2.bounds;
 
-    return coincideX && coincideY && coincideZ;
+    const result = coincideX && coincideY && coincideZ;
+
+    return result;
 }
 
 export function addVec2(a: Vec2, b: Vec2): Vec2 {
@@ -344,6 +353,9 @@ function testCollision(world: World, c1: Body, c2: Body, collisionInfo: Collisio
         let dis, normal;
 
         if (inside && circ2Pos) {
+            if (c1.id === 10) {
+                console.log(c1.id, c1, c2);
+            }
             // the center of circle is inside of c1angle
             setCollisionInfo(collisionInfo, c2.bounds - bestDistance, c1.faceNormals[nearestEdge], subVec2(circ2Pos, scaleVec2(c1.faceNormals[nearestEdge], c2.bounds)));
             return true;

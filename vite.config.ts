@@ -15,6 +15,7 @@ const packedPlugin = {
       const model = await loader.loadAsync(path);
 
       const packed = [];
+      let temp = 0;
 
       model.scene.traverse((model) => {
         if (model.isMesh) {
@@ -29,6 +30,21 @@ const packedPlugin = {
               y: model.geometry.boundingBox.max.y * model.scale.y,
               z: model.geometry.boundingBox.max.z * model.scale.z,
             }
+          }
+
+          if (Math.abs(model.rotation.x) >= Math.PI) {
+            model.rotation.y = Math.PI - model.rotation.y;
+          }
+
+          if (Math.abs(model.rotation.x) > 0 && Math.abs(model.rotation.x) <= (Math.PI / 2) + 0.1) {
+            console.log(model.name);
+
+            temp = box.min.y; box.min.y = box.min.z; box.min.z = temp;
+            temp = box.max.y; box.max.y = box.max.z; box.max.z = temp;
+          }
+
+          if (box.max.y < box.min.y) {
+            temp = box.min.y; box.min.y = box.max.y; box.max.y = temp;
           }
           packed.push({
             id: model.name,

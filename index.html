@@ -4,11 +4,68 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=1" />
-  <title>Flounder</title>
+  <title>Jump Dudes</title>
   <style>
+    @font-face {
+      font-family: GameFont;
+      src: url(src/assets/Bangers-Regular.ttf);
+    }
+
     body {
+      font-family: "GameFont", sans-serif;
       padding: 0;
       margin: 0;
+    }
+
+    .button {
+      font-size: 30px;
+      font-weight: bold;
+      text-shadow:
+        3px 0px 0 #000,
+        -3px 0px 0 #000,
+        -0px -3px 0 #000,
+        -3px -3px 0 #000,
+        3px -3px 0 #000,
+        -3px 3px 0 #000,
+        3px 3px 0 #000,
+        0px 3px 0 #000;
+      border: 3px solid black;
+      padding: 10px;
+      background: grey;
+      line-height: 25px;
+      padding-bottom: 15px;
+      border-radius: 10px;
+      text-align: center;
+    }
+
+    #left {
+      position: absolute;
+      left: 25%;
+      bottom: 18%;
+      background: #f5ad44;
+    }
+
+    #right {
+      position: absolute;
+      right: 25%;
+      bottom: 18%;
+      background: #f5ad44;
+    }
+
+    #joinHolder {
+      position: absolute;
+      width: 100%;
+      bottom: 2%;
+      text-align: center;
+    }
+
+    #join {
+      background: #309a73;
+      font-size: 25px;
+      padding-bottom: 10px;
+      width: 30%;
+      margin-left: auto;
+      margin-right: auto;
     }
 
     #joystick {
@@ -31,9 +88,35 @@
       opacity: 1;
     }
 
+    #logo {
+      position: absolute;
+      width: 20%;
+      left: 5px;
+      top: 5px;
+    }
+
+    #name {
+      font-family: "GameFont", sans-serif;
+      position: absolute;
+      width: 100%;
+      text-align: center;
+      bottom: 20%;
+      font-size: 30px;
+      font-weight: bold;
+      text-shadow:
+        3px 0px 0 #000,
+        -3px 0px 0 #000,
+        -0px -3px 0 #000,
+        -3px -3px 0 #000,
+        3px -3px 0 #000,
+        -3px 3px 0 #000,
+        3px 3px 0 #000,
+        0px 3px 0 #000;
+    }
+
     #debug {
       position: absolute;
-      top: 0;
+      bottom: 0;
       left: 0;
       background: black;
       color: white;
@@ -43,6 +126,15 @@
 </head>
 
 <body>
+  <div id="startScreen">
+    <img id="logo" src="/src/assets/logo.png"></img>
+    <div id="name">Sandy</div>
+    <div id="left" class="button">&lt;</div>
+    <div id="right" class="button">&gt;</div>
+    <div id="joinHolder">
+      <div id="join" class="button">Join Game</div>
+    </div>
+  </div>
   <div id="debug">Data</div>
   <div id="joystick"></div>
   <img id="jump" src="/src/assets/jump.png"></img>

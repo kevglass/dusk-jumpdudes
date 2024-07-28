@@ -6,13 +6,13 @@
   "scripts": {
     "dev": "vite --host",
     "build": "npm run lint && tsc && vite build",
-    "upload": "npm run build && npx dusk-cli@latest upload",
+    "upload": "npm run build && npx dusk-cli@latest upload --name 'Jump Dudes'",
     "lint": "eslint src --ext ts,tsx",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@types/three": "^0.165.0",
-    "dusk-games-sdk": "^4.19.17",
+    "dusk-games-sdk": "^4.20.2",
     "nipplejs": "^0.10.2",
     "node-three-gltf": "^1.8.1",
     "sharp": "^0.33.4",
