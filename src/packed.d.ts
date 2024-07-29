@@ -1,3 +1,3 @@
-declare module '*?packed' {
-    export default content
+declare module "*?packed" {
+  export default content
 }
