@@ -76,6 +76,7 @@ export const PLAYER_TYPES: PlayerType[] = [
     texture: "characters5/Textures/colormap.png",
   },
 ]
+
 export type PlayerControls = {
   x: number
   y: number
@@ -94,21 +95,20 @@ type LevelElement = {
 
 type LevelElementMeta = {
   bounds?: "box" | "circle"
-  type?: "sensor"
   padding?: number
+  sensor: boolean
+  amount: Vec3
+  translate: Vec3
+  moveType: "linear"
+  interval: number
+  offset: number
 }
-
-type MoverType = "SimpleTranslate"
 
 type Mover = {
   bodyId: number
-  type: MoverType
-  amount: number
-  offset: number
-  interval: number
-  dir?: Vec3
   name: string
-  pause?: number
+  meta: LevelElementMeta
+  base: Vec3
 }
 
 export interface GameState {
@@ -129,37 +129,6 @@ export type Player = {
   lastValidRot: number
 }
 
-function calcSimpleTranslateMove(mover: Mover, time: number): Vec3 {
-  if (mover.dir) {
-    const otime = time + mover.offset
-    const t = (otime % mover.interval) / mover.interval
-    const pause = mover.pause ?? 0
-    if (
-      otime % mover.interval < pause ||
-      (otime % mover.interval > mover.interval / 2 &&
-        otime % mover.interval < mover.interval / 2 + pause)
-    ) {
-      return { x: 0, y: 0, z: 0 }
-    }
-    const step =
-      ((mover.amount * 2) / (mover.interval - pause * 2)) * (1000 / 30)
-    if (t < 0.5) {
-      return scaleVec3(mover.dir, step)
-    } else {
-      return scaleVec3(mover.dir, -step)
-    }
-  }
-  return { x: 0, y: 0, z: 0 }
-}
-
-function calcMove(mover: Mover, time: number): Vec3 {
-  if (mover.type === "SimpleTranslate") {
-    return calcSimpleTranslateMove(mover, time)
-  }
-
-  return { x: 0, y: 0, z: 0 }
-}
-
 type GameActions = {
   join(playerType: number): void
 
@@ -168,6 +137,27 @@ type GameActions = {
 
 declare global {
   const Dusk: DuskClient<GameState, GameActions>
+}
+
+function calcLocation(mover: Mover, time: number): Vec3 {
+  if (mover.meta.moveType === "linear") {
+    time += mover.meta.offset
+    let delta = (time % mover.meta.interval) / mover.meta.interval
+    if (delta > 0.5) {
+      delta = 1 - delta
+    }
+    return addVec3(mover.base, scaleVec3(mover.meta.amount, delta))
+  }
+  if (mover.meta.moveType === "sin") {
+    time += mover.meta.offset
+    const delta = Math.sin(
+      ((time % mover.meta.interval) / mover.meta.interval) * Math.PI * 2
+    )
+
+    return addVec3(mover.base, scaleVec3(mover.meta.amount, (delta + 1) / 2))
+  }
+
+  return { x: 0, y: 0, z: 0 }
 }
 
 function addPlayer(
@@ -221,6 +211,7 @@ Dusk.initLogic({
       )
       const size = subVec3(element.box.max, element.box.min)
       const angle = element.rotation
+      let body;
 
       if (meta?.bounds === "circle") {
         if (meta.padding) {
@@ -228,17 +219,23 @@ Dusk.initLogic({
           size.x += meta.padding
         }
 
-        createCylinder(
-          world,
-          center,
-          size,
-          angle,
-          false,
-          meta?.type === "sensor"
-        )
+        body = createCylinder(world, center, size, angle, false, meta?.sensor)
       } else {
-        createBox(world, center, size, angle, false, meta?.type === "sensor")
+        body = createBox(world, center, size, angle, false, meta?.sensor)
       }
+
+      if (meta?.moveType) {
+        movers.push({
+          bodyId: body.id,
+          name: element.id,
+          meta,
+          base: addVec3(
+            center,
+            meta.translate ? meta.translate : { x: 0, y: 0, z: 0 }
+          ),
+        })
+      }
+
       // if (meta?.type === "SimpleTranslate") {
       //   movers.push({
       //     bodyId: body.id,
@@ -266,7 +263,12 @@ Dusk.initLogic({
     for (const mover of game.movers) {
       const body = game.world.bodies.find((p) => p.id === mover.bodyId)
       if (body) {
-        moving[body.id] = calcMove(mover, Dusk.gameTime())
+        body.center = calcLocation(mover, Dusk.gameTime());
+        const next = calcLocation(
+          mover,
+          Dusk.gameTime() + Math.floor(1000 / 30)
+        )
+        moving[body.id] = subVec3(next, body.center);
       }
     }
 

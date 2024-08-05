@@ -32,13 +32,93 @@
         "padding": 0.2
     },
     "block-moving-large002": {
-        "type": "move",
+        "moveType": "linear",
         "amount": {
             "x": 0,
-            "y": -3,
+            "y": -3.85,
             "z": 0
         },
-        "interval": 1000,
+        "interval": 2000,
+        "offset": 1000
+    },
+    "block-moving-large003": {
+        "moveType": "linear",
+        "amount": {
+            "x": 0,
+            "y": -3.85,
+            "z": 0
+        },
+        "interval": 2000,
         "offset": 500
+    },
+    "block-moving-large004": {
+        "moveType": "linear",
+        "amount": {
+            "x": 0,
+            "y": -3.85,
+            "z": 0
+        },
+        "interval": 2000,
+        "offset": 1500
+    },
+    "barrel003": {
+        "moveType": "sin",
+        "amount": {
+            "x": 0,
+            "y": 0,
+            "z": 10
+        },
+        "translate": {
+            "x": 0,
+            "y": 0,
+            "z": -5
+        },
+        "interval": 3000,
+        "offset": 500
+    },
+    "barrel002": {
+        "moveType": "sin",
+        "amount": {
+            "x": 0,
+            "y": 0,
+            "z": 10
+        },
+        "translate": {
+            "x": 0,
+            "y": 0,
+            "z": -5
+        },
+        "interval": 3000,
+        "offset": 1000
+    },
+    "barrel001": {
+        "moveType": "sin",
+        "amount": {
+            "x": 0,
+            "y": 0,
+            "z": 10
+        },
+        "translate": {
+            "x": 0,
+            "y": 0,
+            "z": -5
+        },
+        "interval": 3000,
+        "offset": 2000
+    },
+    "barrel": {
+        "moveType": "sin",
+        "amount": {
+            "x": 0,
+            "y": 0,
+            "z": 10
+        },
+        "translate": {
+            "x": 0,
+            "y": 0,
+            "z": -5
+        },
+        "interval": 3000,
+        "offset": 1500
     }
 }
